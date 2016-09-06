@@ -33,7 +33,7 @@ Function FerriTag(rVar,thick,iter)
 				phi *= -1
 			endif
 			posWave[i][0] = rVar * sin(theta) * cos(phi)
-				posWave[i][1] = rVar * sin(theta) * sin(phi)
+			posWave[i][1] = rVar * sin(theta) * sin(phi)
 			posWave[i][2] = rVar * cos(theta)
 		//	rWave[i] = sqrt( posWave[i][0]^2 + posWave[i][1]^2 + posWave[i][2]^2 )
 		endfor
@@ -45,7 +45,7 @@ Function FerriTag(rVar,thick,iter)
 		MatrixOp/O cX = col(posWave,0)
 		MatrixOp/O cY = col(posWave,1)
 		MatrixOp/O cZ = col(posWave,2)
-			// XZ scetions so test for Y
+		// XZ sections so test for Y
 		cX = ((cY[p] >= front) && (cY[p] < back)) ? cX : NaN
 		cY = ((cY[p] >= front) && (cY[p] < back)) ? cY : NaN
 		cZ = ((cY[p] >= front) && (cY[p] < back)) ? cZ : NaN
@@ -85,7 +85,6 @@ Function DoItAll(small,big)
 	display medianWave vs sizeWave
 End
 
-
 Function TestIt()
 	Variable iter = 100
 	Make/O/N=(iter) medianWave_22,nPartWave_22
@@ -118,4 +117,32 @@ Function TestIt2()
 		medianWave_10[i] = statsmedian(dist_10)
 		nPartWave_10[i] = sum(nPart_10)
 	endfor
+End
+
+////	@param	small		smallest size of tag
+////	@param	big		biggest size of tag
+Function LookAtPDFs(small,big)
+	Variable small
+	Variable big
+	
+	Make/O/N=((big-small)+1) sizeWave,medianWave
+	String wName,histName
+	DoWindow/K pdfPlot
+	Display/N=pdfPlot
+	
+	Variable i
+	
+	for(i = small; i < big+1; i += 1)
+		FerriTag(i,70,100)
+		sizeWave[i-small] = i
+		wName = "dist_" + num2str(i)
+		WAVE w0 = $wName
+		medianWave[i-small] = statsmedian(w0)
+		histName = wName + "_hist"
+		Make/N=111/O $histName
+		Histogram/P/B={0,0.2,111} w0,$histName
+		AppendToGraph/W=pdfPlot $histName
+	endfor
+	DoWindow/K compPlot
+	Display/N=compPlot medianWave vs sizeWave
 End
