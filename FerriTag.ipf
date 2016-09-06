@@ -84,3 +84,38 @@ Function DoItAll(small,big)
 	endfor
 	display medianWave vs sizeWave
 End
+
+
+Function TestIt()
+	Variable iter = 100
+	Make/O/N=(iter) medianWave_22,nPartWave_22
+	
+	WAVE/Z dist_22
+	WAVE/Z nPart_22
+	
+	Variable i,j
+	
+	for(i = 0; i < iter; i += 1)
+		j = ceil(21 + enoise(20))
+		FerriTag(22,70,j)
+		medianWave_22[i] = statsmedian(dist_22)
+		nPartWave_22[i] = sum(nPart_22)
+	endfor
+End
+
+Function TestIt2()
+	Variable iter = 100
+	Make/O/N=(iter) medianWave_10,nPartWave_10
+	
+	WAVE/Z dist_10
+	WAVE/Z nPart_10
+	
+	Variable i,j
+	
+	for(i = 0; i < iter; i += 1)
+		j = ceil(21 + enoise(20))
+		FerriTag(10,70,j)
+		medianWave_10[i] = statsmedian(dist_10)
+		nPartWave_10[i] = sum(nPart_10)
+	endfor
+End
