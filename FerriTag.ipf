@@ -1,19 +1,27 @@
 #pragma TextEncoding = "MacRoman"		// For details execute DisplayHelpTopic "The TextEncoding Pragma"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
-////	@param	rVar	 define the distance e.g. 22 nm
-////	@param	thick	 thickness of section in nm
+////	@param	rr	 		define the distance e.g. 22 nm
+////	@param	ss	 		define the radius of particle e.g. 6.5 nm
+////	@param	thick	 	thickness of section in nm
 ////	@oaram	iter		number of iterations
-Function FerriTag(rVar,thick,iter)
-	Variable rVar
+Function FerriTag(rr,ss,thick,iter)
+	Variable rr
+	Variable ss
 	Variable thick
 	Variable iter
+	// we observe/measure dd
+	// rr = ll + ss
+	// i.e. the length of r from plane to centre of sphere is
+	// length from plane to edge of sphere plus sphere radius
+	if (ss > rr)
+		return -1
+	endif
 	
 	Make/O/D/N=(1000,3) posWave
-//	Make/O/N=1000 rWave
 	Variable nPos=dimsize(posWave,0)
-	Variable theta, phi
+	Variable theta, phi, alpha
 	
-	String wName = "nPart_" + num2str(rVar)
+	String wName = "nPart_" + num2str(rr)
 	Make/O/N=(iter) $wName
 	WAVE w0 = $wName
 	Variable nTag
@@ -24,7 +32,9 @@ Function FerriTag(rVar,thick,iter)
 	for(j = 0; j < iter; j += 1)
 	
 		for(i = 0; i < nPos; i += 1)
-			theta = enoise(pi/2)
+			// add a restriction here for theta
+			alpha = asin(ss / rr)
+			theta = enoise((pi/2) - alpha)
 			phi = enoise(2*pi)
 			if(theta < 0)
 				theta *= -1
@@ -32,13 +42,12 @@ Function FerriTag(rVar,thick,iter)
 			if(phi < 0)
 				phi *= -1
 			endif
-			posWave[i][0] = rVar * sin(theta) * cos(phi)
-			posWave[i][1] = rVar * sin(theta) * sin(phi)
-			posWave[i][2] = rVar * cos(theta)
-		//	rWave[i] = sqrt( posWave[i][0]^2 + posWave[i][1]^2 + posWave[i][2]^2 )
+			posWave[i][0] = rr * sin(theta) * cos(phi)
+			posWave[i][1] = rr * sin(theta) * sin(phi)
+			posWave[i][2] = rr * cos(theta)
 		endfor
 		
-		Variable section = enoise(thick + (rVar/2))	// midpoint
+		Variable section = enoise(thick + (rr/2))	// midpoint
 		Variable front = section - (thick/2)
 		Variable back = section + (thick/2)
 			
@@ -59,7 +68,7 @@ Function FerriTag(rVar,thick,iter)
 		Concatenate/NP {cZ}, w1
 		Concatenate/O/KILL {cX,cY,cZ}, posSect
 	endfor
-	wName = "dist_" + num2str(rVar)
+	wName = "dist_" + num2str(rr)
 	Duplicate/O w1, $wName
 	Killwaves w1
 End
@@ -76,47 +85,13 @@ Function DoItAll(small,big)
 	Variable i
 	
 	for(i = small; i < big+1; i += 1)
-		FerriTag(i,70,100)
+		FerriTag(i,6.5,70,100)
 		sizeWave[i-small] = i
 		wName = "dist_" + num2str(i)
 		WAVE w0 = $wName
 		medianWave[i-small] = statsmedian(w0)
 	endfor
 	display medianWave vs sizeWave
-End
-
-Function TestIt()
-	Variable iter = 100
-	Make/O/N=(iter) medianWave_22,nPartWave_22
-	
-	WAVE/Z dist_22
-	WAVE/Z nPart_22
-	
-	Variable i,j
-	
-	for(i = 0; i < iter; i += 1)
-		j = ceil(21 + enoise(20))
-		FerriTag(22,70,j)
-		medianWave_22[i] = statsmedian(dist_22)
-		nPartWave_22[i] = sum(nPart_22)
-	endfor
-End
-
-Function TestIt2()
-	Variable iter = 100
-	Make/O/N=(iter) medianWave_10,nPartWave_10
-	
-	WAVE/Z dist_10
-	WAVE/Z nPart_10
-	
-	Variable i,j
-	
-	for(i = 0; i < iter; i += 1)
-		j = ceil(21 + enoise(20))
-		FerriTag(10,70,j)
-		medianWave_10[i] = statsmedian(dist_10)
-		nPartWave_10[i] = sum(nPart_10)
-	endfor
 End
 
 ////	@param	small		smallest size of tag
@@ -133,7 +108,7 @@ Function LookAtPDFs(small,big)
 	Variable i
 	
 	for(i = small; i < big+1; i += 1)
-		FerriTag(i,70,100)
+		FerriTag(i,6.5,70,100)
 		sizeWave[i-small] = i
 		wName = "dist_" + num2str(i)
 		WAVE w0 = $wName
