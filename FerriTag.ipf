@@ -61,7 +61,8 @@ Function FerriTag(rr,ss,thick,iter)
 		WaveTransform zapnans cX
 		WaveTransform zapnans cY
 		WaveTransform zapnans cZ
-		
+		// add some noise
+		cZ += gnoise(1.5)
 		nTag=numpnts(cZ)
 		w0[j] = nTag
 		
@@ -104,11 +105,12 @@ Function LookAtPDFs(small,big)
 	String wName,histName
 	DoWindow/K pdfPlot
 	Display/N=pdfPlot
+	FlushAllDist()
 	
 	Variable i
 	
 	for(i = small; i < big+1; i += 1)
-		FerriTag(i,6.5,70,100)
+		FerriTag(i,6.5,70,5)
 		sizeWave[i-small] = i
 		wName = "dist_" + num2str(i)
 		WAVE w0 = $wName
@@ -120,4 +122,40 @@ Function LookAtPDFs(small,big)
 	endfor
 	DoWindow/K compPlot
 	Display/N=compPlot medianWave vs sizeWave
+	DoWindow/F pdfPlot
+	MakeFTPlot()
+	Execute "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
+End
+
+Function FlushAllDist()
+	String fulllist = WaveList("*dist*",";","") + WaveList("nPart*",";","")
+	String wName
+	Variable i
+ 
+	for(i = 0; i < ItemsInList(fullList); i += 1)
+		wName= StringFromList(i, fullList)
+		KillWaves/Z $wName		
+	endfor
+End
+
+Function MakeFTPlot()
+	Wave/Z FTMeasWave
+	Wave/Z FTMeasWave_Hist
+	DoWindow/K ftPlot
+	if (!waveexists(FTMeasWave))
+		return -1
+	endif
+	if (!waveexists(FTMeasWave_Hist))
+		Make/N=111/O FTMeasWave_Hist
+		Histogram/B={0,0.2,111} FTMeasWave,FTMeasWave_Hist
+	endif
+	Display/N=ftPlot FTMeasWave_Hist
+	KillWaves/Z bigWave,bigWave_Hist
+	String wList = WaveList("dist_*",";","")
+	wList = RemoveFromList(WaveList("*_hist",";",""), wList,";")
+	Concatenate/O/NP wList, bigWave
+	Make/N=111/O bigWave_Hist
+	Histogram/B={0,0.2,111} bigWave,bigWave_Hist
+	AppendToGraph/W=ftPlot/R bigWave_Hist
+	ModifyGraph/W=ftPlot rgb(bigWave_Hist)=(0,0,65535)
 End
