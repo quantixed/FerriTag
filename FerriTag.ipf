@@ -76,27 +76,6 @@ End
 
 ////	@param	small		smallest size of tag
 ////	@param	big		biggest size of tag
-Function DoItAll(small,big)
-	Variable small
-	Variable big
-	
-	Make/O/N=((big-small)+1) sizeWave,medianWave
-	String wName
-	
-	Variable i
-	
-	for(i = small; i < big+1; i += 1)
-		FerriTag(i,6.5,70,100)
-		sizeWave[i-small] = i
-		wName = "dist_" + num2str(i)
-		WAVE w0 = $wName
-		medianWave[i-small] = statsmedian(w0)
-	endfor
-	display medianWave vs sizeWave
-End
-
-////	@param	small		smallest size of tag
-////	@param	big		biggest size of tag
 Function LookAtPDFs(small,big)
 	Variable small
 	Variable big
@@ -124,7 +103,7 @@ Function LookAtPDFs(small,big)
 	Display/N=compPlot medianWave vs sizeWave
 	DoWindow/F pdfPlot
 	MakeFTPlot()
-	Execute "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
+	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
 End
 
 Function FlushAllDist()
@@ -158,4 +137,41 @@ Function MakeFTPlot()
 	Histogram/B={0,0.2,111} bigWave,bigWave_Hist
 	AppendToGraph/W=ftPlot/R bigWave_Hist
 	ModifyGraph/W=ftPlot rgb(bigWave_Hist)=(0,0,65535)
+End
+
+Function MedCalc()
+	String nList = WaveList("nPart*",";","")
+	String wName
+	Variable nWaves = ItemsInList(nList)
+	Variable obs,nmVar
+	Make/O/N=0 nWave
+	
+	Variable i
+	
+	for (i = 0; i < nWaves; i += 1)
+		wName = StringFromList(i,nList)
+		Duplicate/O $wName w0
+		WaveTransform zapnans w0
+		obs = sum(w0)
+		nmVar = str2num(ReplaceString("nPart_",wName,""))
+		Make/O/N=(obs) w1 = nmVar
+		Concatenate/NP {w1}, nWave
+	endfor
+	Variable ans = StatsMedian(nWave)
+	KillWaves nWave,w0
+	Return ans
+End
+
+Function RunMultiple(nTrials)
+	Variable nTrials
+	
+	Make/O/N=(nTrials,2) MedianOutput
+	Variable i
+	
+	for (i = 0; i < nTrials; i += 1)
+		LookAtPDFs(7,18)
+		Wave/Z bigWave
+		MedianOutput[i][0] = StatsMedian(bigWave)
+		MedianOutput[i][1] = MedCalc()
+	endfor
 End
