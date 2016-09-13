@@ -101,6 +101,7 @@ Function LookAtPDFs(small,big)
 	Display/N=compPlot medianWave vs sizeWave
 	DoWindow/F pdfPlot
 	MakeFTPlot()
+	TidyUpPlots()
 	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
 End
 
@@ -118,15 +119,19 @@ End
 
 // This makes a plot of the observed values versus experimental values
 Function MakeFTPlot()
-	Wave/Z FTMeasWave
+	Wave/Z FTMeasWave // wave containing experimental values.
 	Wave/Z FTMeasWave_Hist
+	
+	Variable tempvar
 	DoWindow/K ftPlot
 	if (!waveexists(FTMeasWave))
 		return -1
 	endif
 	if (!waveexists(FTMeasWave_Hist))
 		Make/N=111/O FTMeasWave_Hist
-		Histogram/P/B={0,0.2,111} FTMeasWave,FTMeasWave_Hist
+		Histogram/B={0,0.2,111} FTMeasWave,FTMeasWave_Hist
+		tempvar = sum(FTMeasWave_Hist)
+		FTMeasWave_Hist /= tempvar
 	endif
 	Display/N=ftPlot FTMeasWave_Hist
 	KillWaves/Z bigWave,bigWave_Hist
@@ -134,8 +139,10 @@ Function MakeFTPlot()
 	wList = RemoveFromList(WaveList("*_hist",";",""), wList,";")
 	Concatenate/O/NP wList, bigWave
 	Make/N=111/O bigWave_Hist
-	Histogram/P/B={0,0.2,111} bigWave,bigWave_Hist
-	AppendToGraph/W=ftPlot/R bigWave_Hist
+	Histogram/B={0,0.2,111} bigWave,bigWave_Hist
+	tempvar = sum(bigWave_Hist)
+	bigWave_Hist /= tempvar
+	AppendToGraph/W=ftPlot bigWave_Hist
 	ModifyGraph/W=ftPlot rgb(bigWave_Hist)=(0,0,65535)
 End
 
@@ -275,10 +282,12 @@ Function LookAtPDFsSphere(small,big)
 	Display/N=compPlot medianWave vs sizeWave
 	DoWindow/F pdfPlot
 	MakeFTPlotSphere()
+	TidyUpPlots()
 	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
 End
 
 // This makes a plot of the observed values versus experimental values
+// FTMeas values are not required here.
 Function MakeFTPlotSphere()
 	DoWindow/K ftPlot
 	Display/N=ftPlot
@@ -291,6 +300,8 @@ Function MakeFTPlotSphere()
 	AppendToGraph/W=ftPlot bigWave_Hist
 	ModifyGraph/W=ftPlot rgb(bigWave_Hist)=(0,0,65535)
 End
+
+//------------------
 
 // This function makes a grid of dots to append as a scatter plot to Gizmo
 // Indicates the position of the plasma membrane.
@@ -385,5 +396,61 @@ Function PowerTest(small, big)
 	ModifyLayout/W=plot3DLayout units=0
 	ModifyLayout/W=plot3DLayout frame=0,trans=1
 	Execute /Q "Tile/A=(4,2) plot3D,plot3Dz"
+End
+
+Function TidyUpPlots()
+	Label/W=ftPlot left "Frequency"
+	Label/W=ftPlot bottom "Measurement (nm)"
+	SetAxis/W=ftPlot/A/N=1 left
+	Legend/W=ftPlot/C/N=text0/J/F=0/X=0.00/Y=0.00 "\\s(FTMeasWave_Hist) Experimental\r\\s(bigWave_Hist) Simulation"
+	Label/W=pdfPlot left "Frequency"
+	Label/W=pdfPlot bottom "Measurement (nm)"
+	SetAxis/W=pdfPlot/A/N=1 left
+	Legend/W=pdfPlot/C/N=text0/J/F=0/X=0.00/Y=0.00 "\\s(dist_7_hist) 7 nm\r\\s(dist_10_hist) 10 nm\r\\s(dist_13_hist) 13 nm\r\\s(dist_16_hist) 16 nm\r\\s(dist_18_hist) 18 nm"
+	Label/W=compPlot bottom "FerriTag length states (nm)"
+	Label/W=compPlot left "Median measurement (nm)"
+	SetAxis/W=compPlot/A/N=1 left
+	ModifyGraph/W=compPlot mode=4
+	ModifyGraph/W=compPlot width={Plan,1,bottom,left}
 	
+	DoWindow/F pdfPlot
+	ColorTraces(0, "YellowHot")
+	
+	// Make Layout
+	DoWindow/K plotLayout
+	NewLayout/N=plotLayout
+	LayoutPageAction/W=plotLayout size(-1)=(595, 842), margins(-1)=(18, 18, 18, 18)
+	AppendLayoutObject/W=plotLayout graph pdfPlot
+	AppendLayoutObject/W=plotLayout graph ftPlot
+	AppendLayoutObject/W=plotLayout graph compPlot
+	ModifyLayout/W=plotLayout units=0
+	ModifyLayout/W=plotLayout frame=0,trans=1
+	ModifyLayout/W=plotLayout left(pdfPlot)=21,top(pdfPlot)=21,width(pdfPlot)=180,height(pdfPlot)=160
+	ModifyLayout/W=plotLayout left(ftPlot)=208,top(ftPlot)=21,width(ftPlot)=200,height(ftPlot)=160
+	ModifyLayout/W=plotLayout left(compPlot)=415,top(compPlot)=54,width(compPlot)=146,height(compPlot)=120
+End
+
+// This function is from enlacequimico, edit by chozo and me
+Function ColorTraces( rev, colorTable )
+	Variable rev 
+	String colorTable 
+ 
+	String list = TraceNameList( "", ";", 1 )
+	Variable numItems = ItemsInList( list )
+	if ( numItems == 0 )
+		return 0
+	endif
+ 
+	ColorTab2Wave $colorTable
+	Wave M_colors	
+ 
+	Variable index, traceindex
+	for( index = 0; index < numItems; index += 1 )			
+		Variable row = ( index/numItems )*DimSize( M_Colors, 0 )
+		traceindex = ( rev == 0 ? index : numItems-1 - index )
+		Variable red = M_Colors[ row ][ 0 ], green = M_Colors[ row ][ 1 ], blue = M_Colors[ row ][ 2 ]
+		ModifyGraph/Z rgb[ traceindex ] = ( red, green, blue )
+	endfor
+ 
+	KillWaves/Z M_colors
 End
