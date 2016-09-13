@@ -291,3 +291,99 @@ Function MakeFTPlotSphere()
 	AppendToGraph/W=ftPlot bigWave_Hist
 	ModifyGraph/W=ftPlot rgb(bigWave_Hist)=(0,0,65535)
 End
+
+// This function makes a grid of dots to append as a scatter plot to Gizmo
+// Indicates the position of the plasma membrane.
+Function PMMaker()
+	Make/O/N=(2025,3) PMwave=0
+	
+	Variable i,j,k
+	
+	for(i = 0; i < 45; i += 1)
+		for(j = 0; j < 45; j += 1)
+			PMwave[k][0] = i - 22
+			PMwave[k][1] = j - 22
+			k += 1
+		endfor
+	endfor
+End
+
+// Plot Gizmo?
+
+// Power calculation
+Function PowerTest(small, big)
+	Variable small
+	Variable big
+	
+	String mw1Name, nPw1Name, w1Name
+	String dw0Name, nPw0Name
+	Variable iter
+	Variable i,j,k
+	
+	for(i = small; i < (big + 1); i += 1)
+		mw1Name = "temp_med_" + num2str(i)
+		nPw1Name = "temp_nP_" + num2str(i)
+		w1Name = "temp_w_" + num2str(i)
+		Make/O/N=(100) $mw1Name,$nPw1Name
+		Wave mw1 = $mw1Name
+		Wave nPw1 = $nPw1Name
+		Make/O/N=(100) $w1Name = i
+		Wave w1 = $w1Name
+		
+		dw0Name = "dist_" + num2str(i)
+		nPw0Name = "nPart_" + num2str(i)
+		
+		Wave/Z dw0 = $dw0Name
+		Wave/Z nPw0 = $nPw0Name
+		
+		for(j = 0; j < 100; j += 1)
+			iter = ceil(21 + enoise(20))
+			FerriTag(i,6.5,70,iter)
+			mw1[j] = statsmedian(dw0)
+			nPw1[j] = sum(npw0)
+		endfor
+		
+		// alterations to waves for display
+		Sort nPw1,nPw1,mw1
+		InsertPoints /M=0 100, 1, nPw1,mw1,w1
+		nPw1[100] = NaN
+		mw1[100] = NaN
+		w1[100] = NaN
+	endfor
+	
+	String wList = WaveList("temp_med_*",";","")
+	Concatenate/O/NP/KILL wList,yW
+	wList = WaveList("temp_nP_*",";","")
+	Concatenate/O/NP/KILL wList,xW
+	wList = WaveList("temp_w_*",";","")
+	Concatenate/O/NP/KILL wList,zW
+	Concatenate/O/KILL {xW,yW,zW},ResultWave3D
+	
+	DoWindow/K plot3D
+	Display/N=plot3D ResultWave3D[][1] vs ResultWave3D[][0]
+	ModifyGraph/W=plot3D zColor(ResultWave3D)={ResultWave3D[*][2],6,24,YellowHot,0}
+	Label/W=plot3D left "Median distance (nm)"
+	Label/W=plot3D bottom "Measurements"
+	SetAxis/W=plot3D/A/N=1/E=1 left
+	SetAxis/W=plot3D/A/N=1 bottom
+	ColorScale/W=plot3D/C/N=text0/F=0/A=MC vert=0,side=2,trace=ResultWave3D,minor=1
+	ColorScale/W=plot3D/C/N=text0/A=RB/X=0.00/Y=0.00
+	
+	DoWindow/K plot3Dz
+	Display/N=plot3Dz ResultWave3D[][1] vs ResultWave3D[][0]
+	ModifyGraph/W=plot3Dz zColor(ResultWave3D)={ResultWave3D[*][2],6,24,YellowHot,0}
+	Label/W=plot3Dz left "Median distance (nm)"
+	Label/W=plot3Dz bottom "Measurements"
+	SetAxis/W=plot3Dz/A/N=1 left
+	SetAxis/W=plot3Dz bottom 0,1000
+	
+	DoWindow/K plot3DLayout
+	NewLayout/N=plot3DLayout
+	LayoutPageAction/W=plot3DLayout size(-1)=(595, 842), margins(-1)=(18, 18, 18, 18)
+	AppendLayoutObject/W=plot3DLayout graph plot3D
+	AppendLayoutObject/W=plot3DLayout graph plot3Dz
+	ModifyLayout/W=plot3DLayout units=0
+	ModifyLayout/W=plot3DLayout frame=0,trans=1
+	Execute /Q "Tile/A=(4,2) plot3D,plot3Dz"
+	
+End
