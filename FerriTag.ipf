@@ -99,9 +99,12 @@ Function LookAtPDFs(small,big)
 	endfor
 	DoWindow/K compPlot
 	Display/N=compPlot medianWave vs sizeWave
+	DoWindow/F compPlot
+	CurveFit/M=2/W=0 line, medianWave/X=sizeWave/D
+	
 	DoWindow/F pdfPlot
 	MakeFTPlot()
-	TidyUpPlots()
+	TidyUpPlots(0)
 	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
 End
 
@@ -280,9 +283,11 @@ Function LookAtPDFsSphere(small,big)
 	endfor
 	DoWindow/K compPlot
 	Display/N=compPlot medianWave vs sizeWave
+	Wave/Z fit_medianWave
+	ModifyGraph lstyle(fit_medianWave)=3,rgb(fit_medianWave)=(34952,34952,34952)
 	DoWindow/F pdfPlot
 	MakeFTPlotSphere()
-	TidyUpPlots()
+	TidyUpPlots(1)
 	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
 End
 
@@ -398,18 +403,34 @@ Function PowerTest(small, big)
 	Execute /Q "Tile/A=(4,2) plot3D,plot3Dz"
 End
 
-Function TidyUpPlots()
+////	@param sphere	variable to set the function to do a variation
+Function TidyUpPlots(sphere)
+	Variable sphere // if true, do variation
+	
 	Label/W=ftPlot left "Frequency"
 	Label/W=ftPlot bottom "Measurement (nm)"
 	SetAxis/W=ftPlot/A/N=1 left
-	Legend/W=ftPlot/C/N=text0/J/F=0/X=0.00/Y=0.00 "\\s(FTMeasWave_Hist) Experimental\r\\s(bigWave_Hist) Simulation"
+	ModifyGraph/W=ftPlot lowTrip(left)=0.01,notation(left)=1
+	SetAxis/W=ftPlot/A/N=1/E=1 bottom
+	if(sphere)
+		Legend/W=ftPlot/C/N=text0/J/F=0/X=0.00/Y=0.00 "\\s(bigWave_Hist) Simulation"
+	else
+		Legend/W=ftPlot/C/N=text0/J/F=0/X=0.00/Y=0.00 "\\s(FTMeasWave_Hist) Experimental\r\\s(bigWave_Hist) Simulation"
+	endif
 	Label/W=pdfPlot left "Frequency"
 	Label/W=pdfPlot bottom "Measurement (nm)"
 	SetAxis/W=pdfPlot/A/N=1 left
+	ModifyGraph/W=pdfPlot lowTrip(left)=0.01,notation(left)=1
+	SetAxis/W=pdfPlot/A/N=1/E=1 bottom
 	Legend/W=pdfPlot/C/N=text0/J/F=0/X=0.00/Y=0.00 "\\s(dist_7_hist) 7 nm\r\\s(dist_10_hist) 10 nm\r\\s(dist_13_hist) 13 nm\r\\s(dist_16_hist) 16 nm\r\\s(dist_18_hist) 18 nm"
 	Label/W=compPlot bottom "FerriTag length states (nm)"
-	Label/W=compPlot left "Median measurement (nm)"
-	SetAxis/W=compPlot/A/N=1 left
+	Label/W=compPlot left "Measurement (nm)"
+	if(sphere)
+		SetAxis/W=compPlot left -2,10
+	else
+		SetAxis/W=compPlot/A/N=1 left
+	endif
+	
 	ModifyGraph/W=compPlot mode=4
 	ModifyGraph/W=compPlot width={Plan,1,bottom,left}
 	
@@ -425,9 +446,12 @@ Function TidyUpPlots()
 	AppendLayoutObject/W=plotLayout graph compPlot
 	ModifyLayout/W=plotLayout units=0
 	ModifyLayout/W=plotLayout frame=0,trans=1
-	ModifyLayout/W=plotLayout left(pdfPlot)=21,top(pdfPlot)=21,width(pdfPlot)=180,height(pdfPlot)=160
-	ModifyLayout/W=plotLayout left(ftPlot)=208,top(ftPlot)=21,width(ftPlot)=200,height(ftPlot)=160
-	ModifyLayout/W=plotLayout left(compPlot)=415,top(compPlot)=54,width(compPlot)=146,height(compPlot)=120
+	ModifyLayout/W=plotLayout left(pdfPlot)=21,top(pdfPlot)=21,width(pdfPlot)=190,height(pdfPlot)=160
+	ModifyLayout/W=plotLayout left(ftPlot)=220,top(ftPlot)=21,width(ftPlot)=190,height(ftPlot)=160
+	ModifyLayout/W=plotLayout left(compPlot)=420,top(compPlot)=54,width(compPlot)=146,height(compPlot)=120
+	TextBox/W=plotLayout/C/N=text0/F=0/A=LT/X=0.36/Y=0.50 "\\Z12\\F'Helvetica'\\f01A"
+	TextBox/W=plotLayout/C/N=text1/F=0/A=LT/X=36.144/Y=0.50 "\\Z12\\F'Helvetica'\\f01B"
+	TextBox/W=plotLayout/C/N=text2/F=0/A=LT/X=71.91/Y=0.5 "\\Z12\\F'Helvetica'\\f01C"
 End
 
 // This function is from enlacequimico, edit by chozo and me
