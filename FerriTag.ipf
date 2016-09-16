@@ -108,18 +108,6 @@ Function LookAtPDFs(small,big)
 	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
 End
 
-// Gets rid of waves generated in previous analyses
-Function FlushAllDist()
-	String fulllist = WaveList("*dist*",";","") + WaveList("nPart*",";","")
-	String wName
-	Variable i
- 
-	for(i = 0; i < ItemsInList(fullList); i += 1)
-		wName= StringFromList(i, fullList)
-		KillWaves/Z $wName		
-	endfor
-End
-
 // This makes a plot of the observed values versus experimental values
 Function MakeFTPlot()
 	Wave/Z FTMeasWave // wave containing experimental values.
@@ -147,50 +135,6 @@ Function MakeFTPlot()
 	bigWave_Hist /= tempvar
 	AppendToGraph/W=ftPlot bigWave_Hist
 	ModifyGraph/W=ftPlot rgb(bigWave_Hist)=(0,0,65535)
-End
-
-// This function will calculate the median real state of FT
-// Although an equal number of states from small to big are generated
-// not all are analysed due to section sampling.
-Function MedCalc()
-	String nList = WaveList("nPart*",";","")
-	String wName
-	Variable nWaves = ItemsInList(nList)
-	Variable obs,nmVar
-	Make/O/N=0 nWave
-	
-	Variable i
-	
-	for (i = 0; i < nWaves; i += 1)
-		wName = StringFromList(i,nList)
-		Duplicate/O $wName w0
-		WaveTransform zapnans w0
-		obs = sum(w0)
-		nmVar = str2num(ReplaceString("nPart_",wName,""))
-		Make/O/N=(obs) w1 = nmVar
-		Concatenate/NP {w1}, nWave
-	endfor
-	Variable ans = StatsMedian(nWave)
-	KillWaves nWave,w0
-	Return ans
-End
-
-// This function runs the model multiple times
-// Generates a wave containing the median real state
-// and the median observation of the model
-//// @param	nTrials	Number of times to run LookAtPDFs
-Function RunMultiple(nTrials)
-	Variable nTrials
-	
-	Make/O/N=(nTrials,2) MedianOutput
-	Variable i
-	
-	for (i = 0; i < nTrials; i += 1)
-		LookAtPDFs(7,18)	// 7 nm to 18 nm is hardcoded
-		Wave/Z bigWave
-		MedianOutput[i][0] = StatsMedian(bigWave)
-		MedianOutput[i][1] = MedCalc()
-	endfor
 End
 
 //------------------
@@ -254,7 +198,7 @@ Function FerriTagSphere(rr,thick,iter)
 	Killwaves w1
 End
 
-// This generates probability density functions (not normalised)
+// This generates probability density functions
 // for the model run at various states (sizes)
 ////	@param	small		smallest size of tag
 ////	@param	big		biggest size of tag
@@ -308,25 +252,10 @@ End
 
 //------------------
 
-// This function makes a grid of dots to append as a scatter plot to Gizmo
-// Indicates the position of the plasma membrane.
-Function PMMaker()
-	Make/O/N=(2025,3) PMwave=0
-	
-	Variable i,j,k
-	
-	for(i = 0; i < 45; i += 1)
-		for(j = 0; j < 45; j += 1)
-			PMwave[k][0] = i - 22
-			PMwave[k][1] = j - 22
-			k += 1
-		endfor
-	endfor
-End
-
-// Plot Gizmo?
-
-// Power calculation
+// Not quite a power calculation, but this function estimates the number of
+// measurements required to get a good estimate of the real length state
+////	@param	small	variable to set the smallest length state of FerriTag
+////	@param	big	variable to set the largest length state of FerriTag
 Function PowerTest(small, big)
 	Variable small
 	Variable big
@@ -403,6 +332,55 @@ Function PowerTest(small, big)
 	Execute /Q "Tile/A=(4,2) plot3D,plot3Dz"
 End
 
+// This function will calculate the median real state of FT
+// Although an equal number of states from small to big are generated
+// not all are analysed due to section sampling.
+Function MedCalc()
+	String nList = WaveList("nPart*",";","")
+	String wName
+	Variable nWaves = ItemsInList(nList)
+	Variable obs,nmVar
+	Make/O/N=0 nWave
+	
+	Variable i
+	
+	for (i = 0; i < nWaves; i += 1)
+		wName = StringFromList(i,nList)
+		Duplicate/O $wName w0
+		WaveTransform zapnans w0
+		obs = sum(w0)
+		nmVar = str2num(ReplaceString("nPart_",wName,""))
+		Make/O/N=(obs) w1 = nmVar
+		Concatenate/NP {w1}, nWave
+	endfor
+	Variable ans = StatsMedian(nWave)
+	KillWaves nWave,w0
+	Return ans
+End
+
+// This function runs the model multiple times
+// Generates a wave containing the median real state
+// and the median observation of the model
+//// @param	nTrials	Number of times to run LookAtPDFs
+Function RunMultiple(nTrials)
+	Variable nTrials
+	
+	Make/O/N=(nTrials,2) MedianOutput
+	Variable i
+	
+	for (i = 0; i < nTrials; i += 1)
+		LookAtPDFs(7,18)	// 7 nm to 18 nm is hardcoded
+		Wave/Z bigWave
+		MedianOutput[i][0] = StatsMedian(bigWave)
+		MedianOutput[i][1] = MedCalc()
+	endfor
+End
+
+//------------------------------------------------------------------------------------
+//Utility Functions below
+
+// This function tidies the plots created by the main functions
+// It adds them to a layout to make the figure
 ////	@param sphere	variable to set the function to do a variation
 Function TidyUpPlots(sphere)
 	Variable sphere // if true, do variation
@@ -455,6 +433,7 @@ Function TidyUpPlots(sphere)
 End
 
 // This function is from enlacequimico, edit by chozo and me
+// It will set the traces to be different colours from a Colour Table
 Function ColorTraces( rev, colorTable )
 	Variable rev 
 	String colorTable 
@@ -477,4 +456,32 @@ Function ColorTraces( rev, colorTable )
 	endfor
  
 	KillWaves/Z M_colors
+End
+
+// Gets rid of waves generated in previous analyses
+Function FlushAllDist()
+	String fulllist = WaveList("*dist*",";","") + WaveList("nPart*",";","")
+	String wName
+	Variable i
+ 
+	for(i = 0; i < ItemsInList(fullList); i += 1)
+		wName= StringFromList(i, fullList)
+		KillWaves/Z $wName		
+	endfor
+End
+
+// This function makes a grid of dots to append as a scatter plot to Gizmo
+// Indicates the position of the plasma membrane.
+Function PMMaker()
+	Make/O/N=(2025,3) PMwave=0
+	
+	Variable i,j,k
+	
+	for(i = 0; i < 45; i += 1)
+		for(j = 0; j < 45; j += 1)
+			PMwave[k][0] = i - 22
+			PMwave[k][1] = j - 22
+			k += 1
+		endfor
+	endfor
 End
