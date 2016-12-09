@@ -185,6 +185,8 @@ Function FerriTagSphere(rr,thick,iter)
 		WaveTransform zapnans cX
 		WaveTransform zapnans cY
 		WaveTransform zapnans cZ
+		// added this because the distance cannot be negative
+		cZ = abs(cZ)
 		// add some noise
 		cZ += gnoise(1.5)
 		nTag=numpnts(cZ)
