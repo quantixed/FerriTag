@@ -3,7 +3,7 @@
 
 Function ProcessIMODModels()
 	
-	String expDiskFolderName, expDataFileName
+	String expDiskFolderName
 	String FileList, ThisFile, pdfName
 	Variable FileLoop, nWaves, i
 	
@@ -19,7 +19,6 @@ Function ProcessIMODModels()
 	
 	for (FileLoop = 0; FileLoop < nFiles; FileLoop += 1)
 		ThisFile = StringFromList(FileLoop, FileList)
-		expDataFileName = ReplaceString(".txt",ThisFile,"")	// get rid of .tif
 		LoadWave/A/J/D/O/K=1/V={" "," $",0,0}/L={0,0,0,1,0}/P=expDiskFolder ThisFile
 		PlotFTData()
 		ScaleIt(ThisFile)
@@ -35,7 +34,6 @@ Function PlotFTData()
 	WaveStats/Q/RMD=[][0] matA
 	Variable nObjects = V_max + 1
 	Variable nRows = dimsize(MatA,0)
-	Make/O/FREE/N=(nRows) IndexWave = p // sure about this?
 	Variable nContours, rowStart, rowEnd
 	
 	DoWindow/K FTPlot
@@ -119,7 +117,9 @@ Function ProcessTIFFs()
 	endfor
 End
 
-
+// Use this tool to check the scale bar on micrographs taken on a JEOL 1400 with iTEM software
+// This software prints a scale bar which can be machine read.
+/// @param	matB	TIFF image wave reference
 Function CheckScaleBar(matB)
 	Wave matB
 	

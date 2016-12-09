@@ -1,16 +1,30 @@
 #pragma TextEncoding = "MacRoman"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
+// Menu item for easy execution
+Menu "Macros"
+	"FerriTag Analysis...",  IMODModelAnalysis()
+End
+
 Function IMODModelAnalysis()
-	// LoadScales()
 	LoadIMODModels()
 	ProcessAllModels()
 	CollectAllMeasurements()
 	MakeSummaryLayout()
 	RotatePits()
+	OverlayAllPits()
 End
 
 Function LoadIMODModels()
+	// Check we have FileName wave and PixelSize
+	Wave/T/Z FileName = root:FileName
+	Wave/Z PixelSize = root:PixelSize
+	if (!waveexists(FileName))
+		Abort "Missing FileName textwave"
+	endif
+	if(!WaveExists(PixelSize))
+		Abort "Missing PixelWave numeric wave"
+	endif
 	
 	NewDataFolder/O/S root:data
 	
@@ -516,7 +530,6 @@ Function PlotRotatedPit(folderName)
 	ModifyGraph/W=$plotName noLabel=2,axThick=0
 	// add to layout
 	AppendLayoutObject/W=testLayout graph $plotName
-//		AppendLayoutObject/W=summaryLayout graph $plotName
 End
 
 // generate the figure
@@ -559,4 +572,54 @@ Function ShowMePlot(folderName)
 	ModifyGraph/W=FTplot width={plan,1,bottom,left}
 	ModifyGraph/W=FTplot noLabel=2,axThick=0
 	SetDataFolder root:
+End
+
+Function OverlayAllPits()
+	SetDataFolder root:data:	// relies on earlier load
+	DFREF dfr = GetDataFolderDFR()
+	String folderName
+	Variable numDataFolders = CountObjectsDFR(dfr, 4)
+	String wList,wName
+	
+	DoWindow/K allPitOverlay
+	Display/N=allPitOverlay
+	
+	Variable i
+	
+	for(i = 0; i < numDataFolders; i += 1)
+		folderName = GetIndexedObjNameDFR(dfr, 4, i)
+		SetDataFolder ":'" + folderName + "':"
+		WAVE/Z rPMWave
+		WAVE/Z rFTWave
+		AppendToGraph/W=allPitOverlay rPMWave[][1] vs rPMWave[][0]
+		AppendToGraph/W=allPitOverlay rFTWave[][1] vs rFTWave[][0]
+		SetDataFolder root:data:
+	endfor
+	
+	String tList = TraceNameList("allPitOverlay",";",1)
+	String tName
+	Variable nTraces = ItemsInlist(tList)
+	
+	for(i = 0; i < nTraces; i += 1)
+		tName = StringFromList(i,tList)
+		if(StringMatch(tName, "rPM*")==1)
+			ModifyGraph/W=allPitOverlay rgb($tName)=(0,0,0,16384)
+		elseif(StringMatch(tName, "rFT*")==1)
+			ModifyGraph/W=allPitOverlay rgb($tName)=(655355,0,0,32768)
+			ModifyGraph/W=allPitOverlay mode($tName)=3,marker($tName)=19
+			ModifyGraph/W=allPitOverlay msize($tName)=1.5
+		endif
+	endfor
+	
+	ModifyGraph/W=allPitOverlay width={plan,1,bottom,left}
+	SetAxis/W=allPitOverlay left -200,100
+	SetAxis/W=allPitOverlay bottom -150,150
+	ModifyGraph/W=allPitOverlay margin=10
+	ModifyGraph/W=allPitOverlay noLabel=2,axThick=0
+	// add to layout
+	AppendLayoutObject/W=testLayout graph allPitOverlay
+	ModifyLayout/W=testLayout units=0
+	ModifyLayout/W=testLayout frame=0,trans=1
+	DoWindow/F testLayout
+	Execute /Q "Tile/A=(10,5)"
 End
