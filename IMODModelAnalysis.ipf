@@ -623,3 +623,74 @@ Function OverlayAllPits()
 	DoWindow/F testLayout
 	Execute /Q "Tile/A=(10,5)"
 End
+
+// Additional function to look at the length of PM that is inside vs outside the pit
+Function OutsideVsInside()
+	SetDataFolder root:data:	// relies on earlier load
+	DFREF dfr = GetDataFolderDFR()
+	String folderName
+	Variable numDataFolders = CountObjectsDFR(dfr, 4)
+	Make/O/N=(numDataFolders,4) root:OVIwave // 0 = outLength, 1 = inLength, 2 = outNum, 3 = inNum
+	Wave OVIWave = root:OVIwave
+	String wList,wName
+	Variable rStart, rEnd, rFT // rows of PMw
+	
+	Variable i,j
+	Variable ii, nFT
+		
+	for(i = 0; i < numDataFolders; i += 1)
+		folderName = GetIndexedObjNameDFR(dfr, 4, i)
+		SetDataFolder ":'" + folderName + "':"
+		wList = WaveList("PM_*",";","")
+		wName = StringFromList(0,wList) // it is probably PM_0
+		Wave PMw = $wName
+		WAVE/Z cPit, distWave, rowPM, pitStartStop
+		if (pitStartStop[0] < pitStartStop[1])
+			rStart = pitStartStop[0]
+			rEnd = pitStartStop[1]
+		else
+			rStart = pitStartStop[1]
+			rEnd = pitStartStop[0]
+		endif
+		//
+		Duplicate/O/RMD=[0,rStart][0,2] PMw, w0
+		OVIWave[i][0] = ContourLength(w0)	//contour length of left side of pit
+		Duplicate/O/RMD=[rEnd,*][0,2] PMw, w0
+		OVIWave[i][0] += ContourLength(w0) // contour length of right side of pit
+		OVIWave[i][1] = cPit[0]
+		//
+		nFT = numpnts(rowPM)
+		ii = 0
+		for(j = 0; j < nFT; j += 1)
+			if(rowPM[j] < rStart || rowPM[j] > rEnd)
+				ii +=1
+			endif
+		endfor
+		OVIWave[i][2] = ii
+		OVIWave[i][3] = nFT - ii
+		KillWaves/Z w0,result,result2,result3
+		SetDataFolder root:data:
+	endfor
+	SetDataFolder root:
+	Make/O/N=(numDataFolders) w1,w2,xjit1,xjit2
+	w1 = OVIwave[p][3] / OVIWave[p][1]
+	w2 = OVIwave[p][2] / OVIWave[p][0]
+	xjit1 = 0 + gnoise(0.1)
+	Concatenate/O/KILL {w1,xJit1}, OVIfreqIn
+	xjit2 = 1 + gnoise(0.1)
+	Concatenate/O/KILL {w2,xJit2}, OVIfreqOut
+End
+
+//
+// cFT = contour length from start of pit to FT intersect on membrane
+// cPit = length of Pit
+// distWave = distance of each FT particle to PM
+// FTWave = xyz coords of FT particles
+// m0 = unknown remnant
+// pitStartStop = row numbers of PM_0 corresponding to start and stop of pit
+// PM_0 = xyz coords of PM 
+// ratioFT = ratio of cFT to cPit allows plotting spatially averaged data.
+// rFTWave = rotated FT xy coords
+// rowPM = the row of PM contour where the FT particle is closest (where distwave is measured to)
+// rPMColor = binary wave to color the pit contour
+// rPMWave = rotated PM contour wave xy coords
