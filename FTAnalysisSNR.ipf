@@ -77,8 +77,8 @@ Function LoadTIFFFilesForAnalysis()
 			Duplicate/O W_coef, $newName
 			Wave w0 = $newName
 			// scale the x and y width of 2D gauss fit to nm
-			w0[3] *= pxsize
-			w0[5] *= pxsize
+			w0[3] /= pxsize
+			w0[5] /= pxsize
 			// SNR calc.
 			// now get mean pixel density of 3 x 3 ROI centred on peak
 			xpos = round(W_coef[2])
@@ -215,8 +215,8 @@ End
 
 Function PlotSNRs()
 	SetDataFolder root:
-	WAVE/Z allSNRs
-	if (!WaveExists(allSNRs) || !WaveExists(allSNRs))
+	WAVE/Z allSNRsClean
+	if (!WaveExists(allSNRsClean) || !WaveExists(allSNRsClean))
 		DoAlert 0, "Missing wave"
 		Return -1
 	endif
