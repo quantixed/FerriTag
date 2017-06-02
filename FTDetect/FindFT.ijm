@@ -32,9 +32,7 @@ print("DIR_PATH :"+DIR_PATH);
 		}
 	}
 
-	// Open each image (loop on IM_NAMES) and save them in the destination folder
-	// as the blinded file (IM_PERM_NAME).
-	// Additionally logs both names in the log.txt file created in the destination folder
+	// Open each image then do the inversion/subtraction/detection
 	setBatchMode(true);
 	for(j=0; j<IM_NUMBER; j++){
 		INPUT_PATH=DIR_PATH+IM_NAMES[j];
