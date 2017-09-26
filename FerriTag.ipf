@@ -51,9 +51,9 @@ Function FerriTag(rr,ss,thick,iter)
 		MatrixOp/O cY = col(posWave,1)
 		MatrixOp/O cZ = col(posWave,2)
 		// XZ sections so test for Y
-		cX = ((cY[p] >= front) && (cY[p] < back)) ? cX : NaN
-		cY = ((cY[p] >= front) && (cY[p] < back)) ? cY : NaN
-		cZ = ((cY[p] >= front) && (cY[p] < back)) ? cZ : NaN
+		cX = ((cY[p] >= front) && (cY[p] < back)) ? cX[p] : NaN
+		cY = ((cY[p] >= front) && (cY[p] < back)) ? cY[p] : NaN
+		cZ = ((cY[p] >= front) && (cY[p] < back)) ? cZ[p] : NaN
 		WaveTransform zapnans cX
 		WaveTransform zapnans cY
 		WaveTransform zapnans cZ
@@ -135,6 +135,143 @@ Function MakeFTPlot()
 	bigWave_Hist /= tempvar
 	AppendToGraph/W=ftPlot bigWave_Hist
 	ModifyGraph/W=ftPlot rgb(bigWave_Hist)=(0,0,65535)
+End
+
+//------------------
+
+// The simulation above works by taking steps at defined length states.
+// The functions below work by running the same simulation but allowing the length to vary.
+
+// This function is the engine of the model
+////	@param	rMin		define the minimum length state
+////	@param	rMax		define the maximum length state
+////	@param	ss	 		define the radius of particle e.g. 6.5 nm
+////	@param	thick	 	thickness of section in nm
+////	@oaram	iter		number of iterations
+Function FerriTagFlexi(rMin,rMax,ss,thick,iter)
+	Variable rMin, rMax
+	Variable ss
+	Variable thick
+	Variable iter
+	
+	Make/O/D/N=(1000,4) posWave
+	Variable nPos=dimsize(posWave,0)
+	Variable theta, phi, alpha
+	Variable section, front, back
+	
+	String wName = "nPart_Flexi"
+	Make/O/N=(iter) $wName
+	WAVE w0 = $wName
+	Variable nTag
+	Make/O/N=0 w1
+	Variable rr
+	
+	if (ss > rMin)
+		return -1
+	endif
+	
+	Variable i, j
+	
+	for(j = 0; j < iter; j += 1)
+	
+		for(i = 0; i < nPos; i += 1)
+			// pick rr from distribution
+			rr = rMin + ((rMax - rMin) / 2) + enoise((rMax - rMin) / 2) // equal probability of rr from rMin to rMax
+			alpha = asin(ss / rr) // restriction for FerriTag size
+			theta = abs(enoise(pi/2)) - alpha
+			phi = abs(enoise(2*pi))
+			posWave[i][0] = rr * sin(theta) * cos(phi)
+			posWave[i][1] = rr * sin(theta) * sin(phi)
+			posWave[i][2] = rr * cos(theta)
+			// store the length state
+			posWave[i][3] = rr
+		endfor
+		
+		section = enoise(thick + ((rMax - rMin) / 2))	// midpoint
+		front = section - (thick/2)
+		back = section + (thick/2)
+			
+		MatrixOp/O cX = col(posWave,0)
+		MatrixOp/O cY = col(posWave,1)
+		MatrixOp/O cZ = col(posWave,2)
+		MatrixOp/O cR = col(posWave,3)
+		// XZ sections so test for Y
+		cX = ((cY[p] >= front) && (cY[p] < back)) ? cX[p] : NaN
+		cY = ((cY[p] >= front) && (cY[p] < back)) ? cY[p] : NaN
+		cZ = ((cY[p] >= front) && (cY[p] < back)) ? cZ[p] : NaN
+		cR = ((cY[p] >= front) && (cY[p] < back)) ? cR[p] : NaN
+		WaveTransform zapnans cX
+		WaveTransform zapnans cY
+		WaveTransform zapnans cZ
+		WaveTransform zapnans cR
+		// add some noise
+		cZ += gnoise(1.5)
+		nTag=numpnts(cZ)
+		w0[j] = nTag
+		
+		Concatenate/NP {cZ}, w1
+		Concatenate/NP {cR}, w2
+		Concatenate/O/KILL {cX,cY,cZ}, posSect
+	endfor
+	wName = "dist_flexi"
+	Duplicate/O w1, $wName
+	wName = "ls_flexi"
+	Duplicate/O w2, $wName
+	Killwaves w1,w2,cR,posSect
+End
+
+// This generates probability density functions (not normalised)
+// for the flexi model run at various states (sizes)
+////	@param	small		smallest length state
+////	@param	big		biggest length state
+Function LookAtFlexiPDFs(small,big)
+	Variable small
+	Variable big
+	
+	Variable diff = big - small
+	Variable nSim = ((diff + 1) * diff) / 2
+
+	
+	Make/O/N=(nSim,2) simW // holds limits for simulation
+	Make/O/N=(nSim) medianWave
+	String wName,histName
+	DoWindow/K pdfPlot
+	Display/N=pdfPlot
+	FlushAllDist() // is this needed?
+	
+	Variable dd,i // loop variables
+	Variable j,k = 0
+	
+	for(dd = 1; dd < diff; dd += 1)
+		for(i = small; i < big+1; i += 1)
+			j = i + dd
+			if(j <= big)
+				simW[k][0] = i
+				simW[k][1] = j
+				FerriTagFlexi(i,j,6.5,70,10000)
+				wName = "dist_" + num2str(k)
+				WAVE/Z dist_flexi
+				Duplicate/O dist_flexi, $wName
+				WAVE w0 = $wName
+				medianWave[k] = statsmedian(w0)
+				histName = wName + "_hist"
+				Make/N=141/O $histName
+				Histogram/P/B={0,0.2,141} w0,$histName
+				AppendToGraph/W=pdfPlot $histName
+				k += 1
+			endif
+		endfor
+	endfor
+	
+//	DoWindow/K compPlot
+//	Display/N=compPlot medianWave vs sizeWave
+//	DoWindow/F compPlot
+//	CurveFit/M=2/W=0 line, medianWave/X=sizeWave/D
+//	
+//	DoWindow/F pdfPlot
+//	MakeFTPlot()
+//	TidyUpPlots(0)
+//	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
 End
 
 //------------------
