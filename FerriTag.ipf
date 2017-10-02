@@ -242,13 +242,13 @@ Function LookAtFlexiPDFs(small,big)
 	Variable dd,i // loop variables
 	Variable j,k = 0
 	
-	for(dd = 1; dd < diff; dd += 1)
+	for(dd = 1; dd < diff+1; dd += 1)
 		for(i = small; i < big+1; i += 1)
 			j = i + dd
 			if(j <= big)
 				simW[k][0] = i
 				simW[k][1] = j
-				FerriTagFlexi(i,j,6.5,70,10000)
+				FerriTagFlexi(i,j,4.5,70,10000)
 				wName = "dist_" + num2str(k)
 				WAVE/Z dist_flexi
 				Duplicate/O dist_flexi, $wName
@@ -262,16 +262,51 @@ Function LookAtFlexiPDFs(small,big)
 			endif
 		endfor
 	endfor
+End
+
+Function ComparisonOfPDFs()
+	Wave/Z FTMeasWave // wave containing experimental values.
 	
-//	DoWindow/K compPlot
-//	Display/N=compPlot medianWave vs sizeWave
-//	DoWindow/F compPlot
-//	CurveFit/M=2/W=0 line, medianWave/X=sizeWave/D
-//	
-//	DoWindow/F pdfPlot
-//	MakeFTPlot()
-//	TidyUpPlots(0)
-//	Execute/Q "TileWindows/A=(2,2)/W=(50,50,848,518) compPlot,ftPlot,pdfPlot"
+	KillWindow/Z ksPlot
+	KillWindow/Z simPlot
+	if (!waveexists(FTMeasWave))
+		return -1
+	endif
+
+	Make/N=141/O FTMeasWave_cHist
+	Histogram/CUM/P/B={0,0.2,141} FTMeasWave,FTMeasWave_cHist
+	
+	String wList = WaveList("dist_*",";","")
+	wList = RemoveFromList(WaveList("*_hist",";",""), wList,";")
+	wList = RemoveFromList(WaveList("*_chist",";",""), wList,";")
+	String wName, newName
+	Variable nWaves = ItemsInList(wList)
+	Make/O/N=(nWaves) KSWave
+	Variable i
+	
+	for(i = 0; i < nWaves; i += 1)
+		wName = StringFromList(i,wList)
+		Wave w0 = $wName
+		newName = wName + "_cHist"
+		Make/N=141/O $newName
+		Wave w1 = $newName
+		Histogram/CUM/P/B={0,0.2,141} w0,w1
+		StatsKSTest/Q FTMeasWave_cHist,w1
+		WAVE/Z W_KSResults
+		// use row 6 = PValue(Ne)
+		KSWave[i] = W_KSResults[6]
+	endfor
+	Display/N=ksPlot KSWave
+	ModifyGraph/W=ksPlot mode=1
+	ModifyGraph/W=ksPlot log(left)=1
+	ModifyGraph/W=ksPlot swapXY=1
+	WAVE/Z simW
+	Make/O/N=(dimsize(simW,0) * 3,2) sLengthW = NaN
+	sLengthW[0,*;3][0] = simW[p / 3][0]
+	sLengthW[1,*;3][0] = simW[(p-1) / 3][1]
+	sLengthW[0,*;3][1] = p / 3
+	sLengthW[1,*;3][1] = (p-1) / 3
+	Display/N=simPlot sLengthW[][1] vs sLengthW[][0]
 End
 
 //------------------
