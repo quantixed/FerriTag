@@ -267,39 +267,46 @@ End
 Function ComparisonOfPDFs()
 	Wave/Z FTMeasWave // wave containing experimental values.
 	
-	KillWindow/Z ksPlot
+	KillWindow/Z tssPlot
 	KillWindow/Z simPlot
 	if (!waveexists(FTMeasWave))
 		return -1
 	endif
 
-	Make/N=141/O FTMeasWave_cHist
-	Histogram/CUM/P/B={0,0.2,141} FTMeasWave,FTMeasWave_cHist
+	Make/N=141/O FTMeasWave_Hist
+	Histogram/P/B={0,0.2,141} FTMeasWave,FTMeasWave_Hist
 	
 	String wList = WaveList("dist_*",";","")
-	wList = RemoveFromList(WaveList("*_hist",";",""), wList,";")
-	wList = RemoveFromList(WaveList("*_chist",";",""), wList,";")
+	wList = RemoveFromList(WaveList("*hist",";",""), wList,";")
 	String wName, newName
 	Variable nWaves = ItemsInList(wList)
-	Make/O/N=(nWaves) KSWave
+	
 	Variable i
 	
 	for(i = 0; i < nWaves; i += 1)
 		wName = StringFromList(i,wList)
 		Wave w0 = $wName
-		newName = wName + "_cHist"
+		newName = wName + "_Hist"
 		Make/N=141/O $newName
 		Wave w1 = $newName
-		Histogram/CUM/P/B={0,0.2,141} w0,w1
-		StatsKSTest/Q FTMeasWave_cHist,w1
-		WAVE/Z W_KSResults
-		// use row 6 = PValue(Ne)
-		KSWave[i] = W_KSResults[6]
+		Histogram/P/B={0,0.2,141} w0,w1
 	endfor
-	Display/N=ksPlot KSWave
-	ModifyGraph/W=ksPlot mode=1
-	ModifyGraph/W=ksPlot log(left)=1
-	ModifyGraph/W=ksPlot swapXY=1
+	
+	wList = WaveList("dist_*_Hist",";","")
+	nWaves = ItemsInList(wList)
+	Concatenate/O wList, m0
+	Make/O/N=(141,nWaves) m1
+	m1 = FTMeasWave_Hist[p]
+	MatrixOp/O m2 = m0 - m1
+	MatrixOp/O m3 = m2 * m2
+	MatrixOp/O tssWave = sumCols(m3)
+	Redimension/N=(nWaves) tssWave
+	KillWaves m0,m1,m2,m3
+	
+	Display/N=tssPlot tssWave
+	ModifyGraph/W=tssPlot mode=1
+	ModifyGraph/W=tssPlot log(left)=1
+	ModifyGraph/W=tssPlot swapXY=1
 	WAVE/Z simW
 	Make/O/N=(dimsize(simW,0) * 3,2) sLengthW = NaN
 	sLengthW[0,*;3][0] = simW[p / 3][0]
