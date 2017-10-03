@@ -424,3 +424,42 @@ Function GetPixelData()
 	LoadWave/A/W/J/D/O/K=1/L={0,1,0,1,1}
 	LoadWave/A/W/J/D/O/K=2/L={0,1,0,0,1} S_Path + S_fileName
 End
+
+// This function will save out a csv for import into R
+// It is written to pull out coords and corresponding zones for
+// "real particles".
+/// @param	fileName	string of tiffname (without extension)
+Function ExportRealParticles(fileName)
+	String fileName
+	WAVE/Z ImageNameWave
+	if(!WaveExists(ImageNameWave))
+		Abort "I need ImageNameWave"
+	endif
+	FindValue/TEXT=fileName ImageNameWave
+	if (V_Value == -1)
+		Print "Couldn't find", fileName 
+	endif
+	
+	String mName = "cdW" + num2str(V_Value)
+	Wave m0 = $mName
+	MatrixOp/O cX = col(m0,1) // x coord in pixels
+	MatrixOp/O cY = col(m0,2) // y coord in pixels
+	mName = ReplaceString("cdW",mName,"cdQ")
+	Wave m1 = $mName
+	MatrixOp/O cZ = col(m1,4) // zone for each particle
+	MatrixOp/O cQ = col(m1,3) // quality
+	// get the limits for acceptance
+	WAVE/Z LimitWave
+	Variable zMin = limitWave[V_Value][0]
+	Variable zMax = limitWave[V_Value][1]
+	cX = (cQ[p] > zMin && cQ[p] < zMax) ? cX[p] : NaN
+	cY = (cQ[p] > zMin && cQ[p] < zMax) ? cY[p] : NaN
+	cZ = (cQ[p] > zMin && cQ[p] < zMax) ? cZ[p] : NaN
+	WaveTransform zapNans cX
+	WaveTransform zapNans cY
+	WaveTransform zapNans cZ
+	Concatenate/O {cX,cY,cZ}, expWave
+	KillWaves/Z cQ
+	fileName = fileName + ".txt"
+	Save/J/M="\n" expWave as fileName
+End
