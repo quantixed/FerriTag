@@ -34,6 +34,9 @@ Function LoadTIFFFilesForAnalysis()
 	Variable nFiles=ItemsInList(FileList)
 	Variable nFT = numpnts(TiffName)
 	Variable xpos,ypos,pxSize
+	Variable xBGmin,xBGmax,yBGmin,yBGmax
+	Variable xMax,yMax
+	Variable boxSize,shift
 	String mList, mName, newName
 	
 	for (FileLoop = 0; FileLoop < nFiles; FileLoop += 1)
@@ -42,6 +45,8 @@ Function LoadTIFFFilesForAnalysis()
 		NewDataFolder/O/S $expDataFolderName
 		ImageLoad/O/T=tiff/Q/P=expDiskFolder/N=lImage ThisFile
 		Wave/Z lImage
+		xMax = dimsize(lImage,0)
+		yMax = dimsize(lImage,0)
 		i = 0
 		j = 0
 		do
@@ -57,8 +62,32 @@ Function LoadTIFFFilesForAnalysis()
 			xpos = round(ScaledBGx[i])
 			ypos = round(ScaledBGy[i])
 			mName = "clipBG_" + num2str(j)
-			// Source of error here if xpos or ypos are near the edge of image (not the case for our data)
-			Duplicate/O/R=[xpos-25,xpos+24][ypos-25,ypos+24] lImage, $mName
+			// get bg area (101 x 101)
+			// first check if bg area bumps into edges on x
+			if(xpos - 50 >= 0)
+				xBGmin = xpos - 50
+				xBGmax = xpos + 50
+				if(xpos + 50 > xMax)
+					xBGmin = xMax - 101
+					xBGmax = xMax
+				endif
+			else
+				xBGmin = 0
+				xBGmax = 101
+			endif
+			// now check if bg area bumps into edges on y
+			if(ypos - 50 >= 0)
+				yBGmin = ypos - 50
+				yBGmax = ypos + 50
+				if(ypos + 50 > yMax)
+					yBGmin = yMax - 101
+					yBGmax = yMax
+				endif
+			else
+				yBGmin = 0
+				yBGmax = 101
+			endif
+			Duplicate/O/R=[xBGmin,xBGmax][yBGmin,yBGmax] lImage, $mName
 			//
 			pxSize = PixelSize[i]
 			i += 1
@@ -80,11 +109,27 @@ Function LoadTIFFFilesForAnalysis()
 			w0[3] /= pxsize
 			w0[5] /= pxsize
 			// SNR calc.
-			// now get mean pixel density of 3 x 3 ROI centred on peak
+			// now get mean pixel density of 5 x 5 ROI centred on peak
 			xpos = round(W_coef[2])
 			ypos = round(W_coef[4])
+			// if the fit has gone haywire, the xpos and ypos may be outside the clip
+			// use centre of clip instead
+			if(xpos < DimOffset(m0,0) || xpos > IndexToScale(m0,DimSize(m0,0),0))
+				// clip is 21 x 21
+				xpos = DimOffset(m0,0) + 10
+			endif
+			if(ypos < DimOffset(m0,1) || ypos > IndexToScale(m0,DimSize(m0,1),1))
+				// clip is 21 x 21
+				ypos = DimOffset(m0,1) + 10
+			endif
 			newName = ReplaceString("clip",mName,"ROI")
-			Duplicate/O/R=(xpos-1,xpos+1)(ypos-1,ypos+1) m0, $newName
+			boxSize = round(13 / pxsize) // should be 4,5 or 6 pixels
+			shift = floor(boxSize / 2)
+			if(mod(boxsize,2) == 1)
+				Duplicate/O/R=(xpos-shift,xpos+shift)(ypos-shift,ypos+shift) m0, $newName
+			else
+				Duplicate/O/R=(xpos-shift,xpos+shift-1)(ypos-shift,ypos+shift-1) m0, $newName
+			endif
 			Wave m1 = $newName
 			newName = ReplaceString("clip_",mName,"clipBG_")
 			Wave m2 = $newName
@@ -146,7 +191,7 @@ End
 Function PlotCoefs()
 	SetDataFolder root:
 	WAVE/Z allCoefsClean
-	if (!WaveExists(allCoefsClean) || !WaveExists(allCoefsClean))
+	if (!WaveExists(allCoefsClean))
 		DoAlert 0, "Missing wave"
 		Return -1
 	endif
@@ -216,7 +261,7 @@ End
 Function PlotSNRs()
 	SetDataFolder root:
 	WAVE/Z allSNRsClean
-	if (!WaveExists(allSNRsClean) || !WaveExists(allSNRsClean))
+	if (!WaveExists(allSNRsClean))
 		DoAlert 0, "Missing wave"
 		Return -1
 	endif
@@ -326,7 +371,7 @@ Function WaveChecker()
 	if(!WaveExists(coordBGy))
 		Abort "Missing coordy numeric wave"
 	endif
-	// TIFFs are at 200 px per unit
+	// TIFFs are at 200 px per unit independent of magnification
 	Duplicate/O coordx, Scaledx
 	Duplicate/O coordy, Scaledy
 	Scaledx *=200
