@@ -300,13 +300,14 @@ End
 Function TileLayout(nFiles,plotNum)
 	Variable nFiles,plotNum
 	Variable pgMax = floor((nFiles -1) / plotNum) + 1
+	String exString = "Tile/A=(" + num2str(ceil(plotNum/2) + 1) + ",2)"
 	
 	Variable i
 	
 	DoWindow /F summaryLayout
 	for(i = 1; i < pgMax + 1; i += 1)
 		LayoutPageAction/W=summaryLayout page=(i)
-		Execute /Q "Tile/A=(ceil(plotNum/2),2)"
+		Execute /Q exString
 	endfor
 	SavePICT/PGR=(1,-1)/E=-2/W=(0,0,0,0) as "summary.pdf"
 End
@@ -579,9 +580,10 @@ Function LoadTIFFsAndCalc()
 	endfor
 	// Get rid of CMap waves. These are a colorscale that get loaded with 8-bit color TIFFs
 	KillCMaps()
-//	// Count particles which are within zMin and zMax that are in each area
-//	CountValidParticles()
-//	CalculateDensities()
+	
+	// This is a comparison so we need to find out which file belongs to which condition
+	ConditionsForManual()
+	CalculateDensitiesManual()
 	TileLayout(nFiles,6)
 End
 
@@ -676,7 +678,7 @@ Function ImagePlusSpotsManual(ParentImgMat, imgNum)
 	DoWindow/K imgPlot
 End
 
-Function CountIf(cdQWave,zoneVar)
+STATIC Function CountIf(cdQWave,zoneVar)
 	WAVE cdQWave
 	Variable zoneVar
 	
@@ -687,11 +689,11 @@ Function CountIf(cdQWave,zoneVar)
 End
 
 // For edge cases, need to check that the particle really is outside the cell.
-Function checkVicinity(maskMat,xLoc,yLoc)
+STATIC Function checkVicinity(maskMat,xLoc,yLoc)
 	WAVE maskMat
 	Variable xLoc,yLoc
 	
-	Duplicate/O/FREE/RMD=[xloc-2,xloc+2][yloc-2,yLoc+2] maskMat, m0
+	Duplicate/O/FREE/RMD=[xloc-20,xloc+20][yloc-20,yLoc+20] maskMat, m0
 	
 	Variable aveZone = round(sum(m0) / numpnts(m0))
 	// if this isn't 0 it must be 2. Because 1 is highly unlikely.
@@ -700,4 +702,86 @@ Function checkVicinity(maskMat,xLoc,yLoc)
 	endif
 	
 	return aveZone
+End
+
+Function ConditionsForManual()
+	// load 1 numeric wave with name condWave
+	Print "Locate csv with filenames and conditions"
+	LoadWave/A/W/J/D/O/K=1/L={0,1,0,1,2}
+	// load 1 textwave with name condFileName
+	LoadWave/A/W/J/D/O/K=2/L={0,1,0,0,1} S_Path + S_fileName
+	WAVE/T/Z condFileName
+	WAVE/Z condWave
+	
+	// Make a wave to hold the conditions corresponding to files in Original_Name
+	WAVE/Z/T Original_Name
+	Variable nFiles = numpnts(Original_Name)
+	Make/O/N=(nFiles) Original_Condition
+	String fileName
+	
+	Variable i
+	
+	for(i = 0; i < nFiles; i += 1)
+		fileName = Original_Name[i]
+		FindValue/TEXT=fileName condFileName
+		if (V_Value == -1)
+			Print "Couldn't find", fileName 
+		endif
+		Original_Condition[i] = condWave[V_Value]
+	endfor
+	
+	KillWaves/Z condFileName,condWave
+	
+	// make volume waves per condition (coded for 2 conditions right now)
+	WAVE/Z VolumeWave
+	Duplicate/O VolumeWave, VolumeWave0,VolumeWave1
+	VolumeWave0[][] = (Original_Condition[p] == 0) ? VolumeWave[p][q] : 0
+	VolumeWave1[][] = (Original_Condition[p] == 1) ? VolumeWave[p][q] : 0
+	MatrixOp/O sumV0 = sumcols(volumeWave0)
+	MatrixOp/O sumV1 = sumcols(volumeWave1)
+	Redimension/N=(dimSize(sumV0,1)) sumV0
+	Redimension/N=(dimSize(sumV1,1)) sumV1
+	// make particle waves per condition ()
+	WAVE/Z ParticleWave
+	Duplicate/O ParticleWave, ParticleWave0,ParticleWave1
+	ParticleWave0[][] = (Original_Condition[p] == 0) ? ParticleWave[p][q] : 0
+	ParticleWave1[][] = (Original_Condition[p] == 1) ? ParticleWave[p][q] : 0
+	MatrixOp/O sumP0 = sumcols(particleWave0)
+	MatrixOp/O sumP1 = sumcols(particleWave1)
+	Redimension/N=(dimSize(sumP0,1)) sumP0
+	Redimension/N=(dimSize(sumP1,1)) sumP1
+	// find densities
+	MatrixOp/O density0 = sumP0 / sumV0
+	MatrixOp/O density1 = sumP1 / sumV1
+	// row 3 is garbage (total particles divided by zone 3)
+End
+
+Function CalculateDensitiesManual()
+//	WAVE/Z countWave
+//	WAVE/Z volumeWave
+//	WAVE/Z limitWave
+//	String text0,text1
+//	
+//	Duplicate/O volumeWave, volCorrWave
+//	volCorrWave = (limitWave[p][2] == 1) ? 0 : volCorrWave[p][q]
+//	MatrixOp/O countTotal = sumcols(countWave)
+//	MatrixOp/O volumeTotal = sumcols(volCorrWave)
+//	MatrixOp/O densityWave = sumcols(countWave) / sumcols(volCorrWave)
+//	// Print results to Notebook
+//	KillWindow/Z summaryNotes
+//	NewNotebook/F=0/N=summaryNotes
+//	text0 = num2str(countTotal[0][1])
+//	text1 = num2str(volumeTotal[0][1])
+//	Notebook summaryNotes, text=text0, text=" particles were detected in ", text=text1, text=" µm^3 of cytoplasm.\r"
+//	text0 = num2str(countTotal[0][2])
+//	text1 = num2str(volumeTotal[0][2])
+//	Notebook summaryNotes, text=text0, text=" particles were detected in ", text=text1, text=" µm^3 of membrane zone.\r"
+//	text0 = num2str(countTotal[0][0])
+//	Notebook summaryNotes, text=text0, text=" particles were detected outside the cell.\r\r"
+//	text0 = num2str(densityWave[0][1])
+//	text1 = num2str(densityWave[0][2])
+//	Notebook summaryNotes, text="The cytoplasmic density was ", text=text0
+//	Notebook summaryNotes, text=" and the membrane density was ", text=text1, text=" particles per µm^3.\r"
+//	text0 = num2str(densityWave[0][2] / densityWave[0][1])
+//	Notebook summaryNotes, text="An enrichment of ", text=text0, text="-fold.\r"
 End
