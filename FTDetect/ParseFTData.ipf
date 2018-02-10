@@ -544,7 +544,7 @@ Function LoadTIFFsAndCalc()
 	Variable nRows = numpnts(unblindFileNameWave)
 	
 	Make/O/N=(nFiles,4) volumeWave
-	Make/O/N=(nFiles,4) particleWave
+	Make/O/N=(nFiles,4) particleWave,gridWave
 	Make/O/N=(nFiles) voxelWave
 	Make/O/N=(nRows) zoneWave=NaN
 	
@@ -563,6 +563,9 @@ Function LoadTIFFsAndCalc()
 		
 		// determine zones for each particle
 		DetermineManualParticleZones(ThisFile,maskMat,FileLoop)
+		
+		// make a grid and find coincidence with each zone (stereology method)
+		DetermineGridZones(ThisFile,maskMat,FileLoop)
 		
 		// load the parent image
 		cdJName = "cdJ" + num2str(fileLoop)
@@ -583,7 +586,6 @@ Function LoadTIFFsAndCalc()
 	
 	// This is a comparison so we need to find out which file belongs to which condition
 	ConditionsForManual()
-	CalculateDensitiesManual()
 	TileLayout(nFiles,6)
 End
 
@@ -644,6 +646,43 @@ Function DetermineManualParticleZones(ThisFile,maskMat,FileLoop)
 		particleWave[fileLoop][1] = CountIf(cdQWave,1)	// zone 1 = cyto
 		particleWave[fileLoop][2] = CountIf(cdQWave,2)	//	zone 2 = membrane
 		particleWave[fileLoop][3] = totalP	// total
+	endif
+End
+
+/// @param	ThisFile	name of original tif file
+/// @param	maskMat	brother image with the mask of zones
+/// @param	FileLoop	iteration number from calling function
+Function DetermineGridZones(ThisFile,maskMat,FileLoop)
+	String ThisFile
+	WAVE maskMat
+	Variable FileLoop
+	
+	// In DetermineManualParticleZones, the location of particles was found
+	// each particle was on a different row for all images that are being loaded
+	// So for two images with 4 and 6 particles, there would be ten rows to unblindFileNameWave
+//	WAVE/Z/T unblindFileNameWave
+//	WAVE/Z zoneWave
+//	Variable nRows = numpnts(unblindFileNameWave)
+	// instead of pointLocWave, we make our own gridLocWave
+	Make/O/N=(24,2) gridLocWave
+	// 8 x 6 grid just taking the inner 6 x 4 intersections
+	gridLocWave[][0] = floor((floor(p/4)+1) * (dimsize(maskMat,0) / 8))
+	gridLocWave[][1] = floor((floor(p/6)+1) * (dimsize(maskMat,1) / 6))
+	String wName = "cdS" + num2str(FileLoop)
+	Make/O/N=(24) $wName
+	Wave cdSWave = $wName
+	cdSWave[] = maskMat[gridLocWave[p][0]][gridLocWave[p][1]]
+		
+	// now store counts in gridWave
+	WAVE/Z gridWave
+	Variable totalP = dimsize(cdSWave,0)
+	if(totalP == 0)
+		gridWave[fileLoop][] = totalP
+	else
+		gridWave[fileLoop][0] = CountIf(cdSWave,0)	// zone 0 = outside
+		gridWave[fileLoop][1] = CountIf(cdSWave,1)	// zone 1 = cyto
+		gridWave[fileLoop][2] = CountIf(cdSWave,2)	//	zone 2 = membrane
+		gridWave[fileLoop][3] = totalP	// total
 	endif
 End
 
@@ -756,32 +795,31 @@ Function ConditionsForManual()
 	// row 3 is garbage (total particles divided by zone 3)
 End
 
-Function CalculateDensitiesManual()
-//	WAVE/Z countWave
-//	WAVE/Z volumeWave
-//	WAVE/Z limitWave
-//	String text0,text1
-//	
-//	Duplicate/O volumeWave, volCorrWave
-//	volCorrWave = (limitWave[p][2] == 1) ? 0 : volCorrWave[p][q]
-//	MatrixOp/O countTotal = sumcols(countWave)
-//	MatrixOp/O volumeTotal = sumcols(volCorrWave)
-//	MatrixOp/O densityWave = sumcols(countWave) / sumcols(volCorrWave)
-//	// Print results to Notebook
-//	KillWindow/Z summaryNotes
-//	NewNotebook/F=0/N=summaryNotes
-//	text0 = num2str(countTotal[0][1])
-//	text1 = num2str(volumeTotal[0][1])
-//	Notebook summaryNotes, text=text0, text=" particles were detected in ", text=text1, text=" µm^3 of cytoplasm.\r"
-//	text0 = num2str(countTotal[0][2])
-//	text1 = num2str(volumeTotal[0][2])
-//	Notebook summaryNotes, text=text0, text=" particles were detected in ", text=text1, text=" µm^3 of membrane zone.\r"
-//	text0 = num2str(countTotal[0][0])
-//	Notebook summaryNotes, text=text0, text=" particles were detected outside the cell.\r\r"
-//	text0 = num2str(densityWave[0][1])
-//	text1 = num2str(densityWave[0][2])
-//	Notebook summaryNotes, text="The cytoplasmic density was ", text=text0
-//	Notebook summaryNotes, text=" and the membrane density was ", text=text1, text=" particles per µm^3.\r"
-//	text0 = num2str(densityWave[0][2] / densityWave[0][1])
-//	Notebook summaryNotes, text="An enrichment of ", text=text0, text="-fold.\r"
+Function ConditionsForManualAlt()
+	WAVE/Z Original_Condition
+	if(!WaveExists(Original_Condition))
+		return -1
+	endif
+	WAVE/Z particleWave,VolumeWave
+	MatrixOp/O/FREE tempMat = particleWave / VolumeWave
+	Duplicate/O/R=[][1,2] tempMat, densityWave
+	
+	// Original_condition holds integers corresponding to different cells/conditions
+	Variable nCond = WaveMax(Original_Condition) + 1
+	Variable nRows = dimsize(densityWave,0)
+	String w0Name,w1Name
+	
+	Variable i
+	
+	for(i = 0; i < nCond; i += 1)
+		w0Name = "cyto_" + num2str(i)
+		w1Name = "memb_" + num2str(i)
+		Make/O/N=(nRows) $w0Name, $w1Name
+		Wave w0 = $w0Name
+		Wave w1 = $w1Name
+		w0[] = (Original_Condition[p] == i) ? densityWave[p][0] : NaN
+		w1[] = (Original_Condition[p] == i) ? densityWave[p][1] : NaN
+		WaveTransform zapNans w0
+		WaveTransform zapNans w1
+	endfor
 End
