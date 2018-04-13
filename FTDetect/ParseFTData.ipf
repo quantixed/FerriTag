@@ -470,9 +470,9 @@ Function ExportRealParticles(fileName)
 	WAVE/Z LimitWave
 	Variable zMin = limitWave[V_Value][0]
 	Variable zMax = limitWave[V_Value][1]
-	cX = (cQ[p] > zMin && cQ[p] < zMax) ? cX[p] : NaN
-	cY = (cQ[p] > zMin && cQ[p] < zMax) ? cY[p] : NaN
-	cZ = (cQ[p] > zMin && cQ[p] < zMax) ? cZ[p] : NaN
+	cX = (cQ[p] > zMin && cQ[p] <= zMax) ? cX[p] : NaN
+	cY = (cQ[p] > zMin && cQ[p] <= zMax) ? cY[p] : NaN
+	cZ = (cQ[p] > zMin && cQ[p] <= zMax) ? cZ[p] : NaN
 	WaveTransform zapNans cX
 	WaveTransform zapNans cY
 	WaveTransform zapNans cZ
