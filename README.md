@@ -5,7 +5,7 @@ Code in this repo is for:
 1. [Computer simulations and spatial analysis of FerriTag in Igor Pro](#computer-simulations)
 2. [Nanoscale mapping FerriTag distributions using IMOD outputs](#imod-model-analysis)
 3. [Signal-to-noise ratio calculation and 2D Gauss fitting of FerriTag particles](#2d-gaussian-fitting-and-snr-calculation)
-4. [Automated detection of particles in EM images](#ftdetect)
+4. [Stereological analysis of particles in EM images](#stereology)
 
 
 ## Computer simulations
@@ -71,9 +71,17 @@ There are two layouts which can be saved in a variety of formats.
 In the file [FTAnalysisSNR.ipf](https://github.com/quantixed/FerriTag/blob/master/FTAnalysisSNR.ipf), you will find tools to fit 2D Gaussian functions to FerriTag particles. The location of the peaks is then used to calculate the SNR. The function `LoadTIFFFilesForAnalysis()` works on a directory of TIFFs, but it requires several waves loaded into the experiment to do this properly. See comments for details.
 
 
-## FTDetect
+## Stereology
 
-Automated detection of FerriTag particles in EM images. Particles are detected using [ComDet v0.3.5](https://github.com/ekatrukha/ComDet/tree/3e0dfda90354f968fd9ba2bf25928186993c1ea2). Using `FindFT.ijm`, ImageJ will process a directory of EM images and make a number of detections. The outputs are saved automatically in a directory called `cd` and are used for processing. `ParseFTData.ipf` is used to analyse the outputs from ImageJ. Note that the segmented versions of the EM images are also required (in a directory called `Masks`). See comments for further details.
+The locations of particles in images are recorded in ImageJ and saved as a csv. To do this a images are stripped of metadata and the filenames encoded (using `blind_analysis.
+ijm`) so that the person locating particles is blind to the conditions of the experiment.
 
-### Synthetic data
-Test images with a number of spots can be created for testing analysis methods. `TestImg.ijm` and `TestImgSet.ijm` make a single image or a directory of images for testing. `FindFTTest.ijm` is meant for use with images created synthetically. In reality the real locations of spots could be determined directly so this was not used. `ParseFTTest.ipf` can be used on synthetic images. 
+A segmented version of each EM image is also required (in a directory called `Masks`). See comments for further details.
+
+To run `Stereology Workflow` the following files are needed:
+
+1. Images and a sub directory of Masks
+2. csv with locations of particle xy coords
+3. log file from `blind_analysis` for unblinding the images
+4. csv with pixelsize information
+5. csv with a list of conditions in each image (encoded with an integer).
